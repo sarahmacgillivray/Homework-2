@@ -46,8 +46,10 @@ def relu(x: Tensor):
     def forward_fn():
         return max(0.0, x.data)
 
+    # setup the tensor to send out 
     out = Tensor(parents=(x,), forward_fn=forward_fn)
 
+    # Relu just uses above 0 as a grad to be pass, else it sends no extra grad
     def backward_fn(grad_out):
         local_grad = 1.0 if x.data > 0 else 0.0 
         x.backward(grad_out * local_grad)
@@ -117,7 +119,7 @@ def matmul2x2_bias(W, x, b):
     t10.forward()
     t11.forward()
     
-    # Now we add the produts together and add the bias to get the final output of this layer
+    # Now we add the products together and add the bias to get the final output of this layer
     y0 = add(t00, t01)
     y1 = add(t10, t11)
 

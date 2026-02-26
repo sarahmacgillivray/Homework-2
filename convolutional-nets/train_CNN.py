@@ -139,6 +139,9 @@ def test_model(model, data_dir="numbers_dataset/test", batch_size=32):
 
     accuracy = correct / max(1, total)
     print(f"Test accuracy: {accuracy:.4f}")
+    
+    # Added from Sarah: need to retun the accuracy for the graph
+    return accuracy * 100
 
 
 def main():
