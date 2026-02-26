@@ -1,15 +1,50 @@
 from pathlib import Path
 import argparse
+from xml.parsers.expat import model
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
+NUM_CLASSES = 2
 
 class SimpleCNN(nn.Module):
-    ''' Your code goes here'''
-    pass
+    def __init__(self, num_classes=NUM_CLASSES):
+        super().__init__()
+        self.features = nn.Sequential(
+            # Layer 1: Low-level features (edges)
+            nn.Conv2d(1, 32, 3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            # Layer 2: Mid-level features (curves/shapes)
+            nn.Conv2d(32, 64, 3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            # Layer 3: High-level features (digits/combinations)
+            nn.Conv2d(64, 128, 3, padding=1), # Increased to 128
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+        )
+
+        self.classifier = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 3)),
+            nn.Flatten(),
+            # Need to update input dimension to 128 * 3
+            nn.Linear(128 * 3, 128), 
+            nn.BatchNorm1d(128), # Adding BatchNorm here helps 128 channels stabilize
+            nn.ReLU(),
+            nn.Dropout(0.4), # Slightly higher dropout for the bigger layer
+            nn.Linear(128, num_classes),
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        return self.classifier(x)
 
 
 def neural_network_model():
@@ -18,6 +53,7 @@ def neural_network_model():
 
 def create_dataloader(data_dir, batch_size=32, shuffle=True):
     data_path = Path(data_dir)
+
     transform = transforms.Compose(
         [
             transforms.Grayscale(num_output_channels=1),
@@ -29,15 +65,16 @@ def create_dataloader(data_dir, batch_size=32, shuffle=True):
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 
-
-
 def train_model(model, data_dir="numbers_dataset/train", epochs=100, batch_size=32, lr=1e-3):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     loader = create_dataloader(data_dir, batch_size=batch_size, shuffle=True)
+
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    # adding a scheduler to help with training 
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -47,9 +84,32 @@ def train_model(model, data_dir="numbers_dataset/train", epochs=100, batch_size=
         for images, labels in loader:
             images = images.to(device)
             labels = labels.to(device)
-            ''' Your code goes here'''
+            
+            images = images.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
+            
+            # Set all the gradients to zero before the backward pass
+            optimizer.zero_grad(set_to_none=True)
+            # Send our images through the model to get the logits which are raw scores, then calculate the loss and backpropagate
+            logits = model(images)
+            # Sees how wrong our predictions are
+            loss = criterion(logits, labels)
+            # Send our loss through the backwards pass to calculate the gradients for all the parameters in our model
+            loss.backward()
+            # Updates the weights of our model (basically what we did when we did param.data -= eta * param.grad but now by optimizer)
+            optimizer.step()
+            
+            # Add up our counters
+            running_loss += loss.item() * images.size(0)
+            total += labels.size(0)
+            correct += (logits.argmax(dim=1) == labels).sum().item()
             pass
+        
+        acc = correct / total
+        scheduler.step()
 
+        print(f"Epoch {epoch}, Loss: {running_loss/total:.4f}, Acc: {acc:.4f}")
+        
     return model
 
 
