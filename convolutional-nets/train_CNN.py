@@ -13,33 +13,40 @@ class SimpleCNN(nn.Module):
     def __init__(self, num_classes=NUM_CLASSES):
         super().__init__()
         self.features = nn.Sequential(
-            # Layer 1: Low-level features (edges)
+            # Layer 1
             nn.Conv2d(1, 32, 3, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.MaxPool2d(2),
 
-            # Layer 2: Mid-level features (curves/shapes)
+            # Layer 2
             nn.Conv2d(32, 64, 3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.MaxPool2d(2),
 
-            # Layer 3: High-level features (digits/combinations)
-            nn.Conv2d(64, 128, 3, padding=1), # Increased to 128
+            # Layer 3
+            nn.Conv2d(64, 128, 3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(),
+            nn.MaxPool2d(2),
+            
+            # Layer 4
+            nn.Conv2d(128, 256, 3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
         )
 
         self.classifier = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 3)),
             nn.Flatten(),
-            # Need to update input dimension to 128 * 3
-            nn.Linear(128 * 3, 128), 
-            nn.BatchNorm1d(128), # Adding BatchNorm here helps 128 channels stabilize
+            nn.Linear(256 * 1 * 5, 256),
+            nn.BatchNorm1d(256),
             nn.ReLU(),
-            nn.Dropout(0.4), # Slightly higher dropout for the bigger layer
-            nn.Linear(128, num_classes),
+            nn.Dropout(0.3),  # medium dropout to help with generalization
+            nn.Linear(256, 64),  
+            nn.ReLU(),
+            nn.Linear(64, num_classes),
         )
 
     def forward(self, x):
